@@ -13,6 +13,8 @@ TMC2209Stepper driver(&SERIAL_PORT, R_SENSE);
 // 목표 위치 설정
 long targetPosition = 0;  
 long currentPosition = 0;
+const int MOTORCNT = 1;
+bool driverOn = false;
 
 void setup() {
   pinMode(STEP_PIN, OUTPUT);
@@ -26,26 +28,129 @@ void setup() {
   driver.rms_current(600); // 모터의 RMS 전류 설정
   driver.microsteps(16);   // 마이크로스텝 설정
   driver.en_spreadCycle(true); // SpreadCycle 활성화
+
+  // Start the serial communication at a baud rate of 9600
+  Serial.begin(9600);
+  Serial.println("Enter integers separated by spaces (e.g., '123 456 789'):");
 }
 
 void loop() {
-  if (currentPosition < targetPosition) {
-    digitalWrite(DIR_PIN, HIGH); // 방향 설정
-    currentPosition++;
-  } else if (currentPosition > targetPosition) {
-    digitalWrite(DIR_PIN, LOW); // 방향 설정
-    currentPosition--;
-  } else {
-    return; // 이미 목표 위치에 도달한 경우
+  // Check if data is available to read
+  if (Serial.available() > 0) {
+    // Read the incoming string
+    String incomingData = Serial.readString();
+    
+    // Print the received data
+    Serial.print("Received: ");
+    Serial.println(incomingData);
+
+    if (checkFirstCharacter(incomingData, 'o')) {
+      Serial.println("The first character is 'o'.");
+      digitalWrite(EN_PIN, LOW);  // 모터 활성화
+      driverOn = true;
+      return;
+    }
+    if (checkFirstCharacter(incomingData, 'c')) {
+      Serial.println("The first character is 'c'.");
+      digitalWrite(EN_PIN, HIGH);  // 모터 활성화
+      driverOn = false;
+      return;
+    }
+
+    // Declare an array to hold the integers
+    int numbers[MOTORCNT];
+    
+    // Process the string to extract integers and get the number of integers
+    int numCount = processIncomingData(incomingData, numbers);
   }
 
-  digitalWrite(STEP_PIN, HIGH);
+  if(driverOn){
+    // motor control
+    if (currentPosition < targetPosition) {
+      digitalWrite(DIR_PIN, HIGH); 
+      moveStep(STEP_PIN)
+      currentPosition++;
+    } 
+    else if (currentPosition > targetPosition) {
+      digitalWrite(DIR_PIN, LOW); 
+      moveStep(STEP_PIN)
+      currentPosition--;
+    } 
+    else {
+      return; // already at target
+    }
+  }
+
+}
+
+void moveStep(int MotorPIN) {
+  digitalWrite(MotorPIN, HIGH);
   delayMicroseconds(100); // 스테핑 주기 설정
-  digitalWrite(STEP_PIN, LOW);
+  digitalWrite(MotorPIN, LOW);
   delayMicroseconds(100);
 }
 
-// 위치 설정 함수
 void moveTo(long position) {
   targetPosition = position;
+}
+
+// Function to split the string and convert to integers
+int processIncomingData(String data, int *numbers) {
+  // Trim any leading/trailing spaces from the string
+  data.trim();
+
+  // Declare a temporary variable to hold each integer
+  int number;
+  
+  // Declare a variable to store each substring (i.e., each number)
+  String subString = "";
+
+  int index = 0; // Index for the numbers array
+  
+  // Iterate over each character in the string
+  for (int i = 0; i < data.length(); i++) {
+    char c = data.charAt(i);
+
+    // If we encounter a space or the end of the string, convert the substring to an integer
+    if (c == ' ' || i == data.length() - 1) {
+      // If it's the last character, include it in the substring
+      if (i == data.length() - 1) {
+        subString += c;
+      }
+
+      // Convert the substring to an integer
+      number = subString.toInt();
+      
+      // Store the extracted integer in the array
+      if (index < MOTORCNT) { // Avoid overflow
+        numbers[index] = number;
+        index++;
+      }
+
+      // Clear the substring for the next number
+      subString = "";
+    } 
+    else {
+      // If it's not a space, keep adding characters to the substring
+      subString += c;
+    }
+  }
+
+  // Return the number of integers extracted
+  return index;
+}
+
+// Function to check if the first character of a string matches a specific character
+bool checkFirstCharacter(String data, char specificChar) {
+  // Trim any leading/trailing spaces from the string
+  data.trim();
+
+  // Check if the string is empty
+  if (data.length() == 0) {
+    return false;
+  }
+
+  // Get the first character and compare it
+  char firstChar = data.charAt(0);
+  return firstChar == specificChar;
 }
