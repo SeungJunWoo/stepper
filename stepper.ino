@@ -1,14 +1,14 @@
 #include <TMCStepper.h>
 
 // 핀 설정
-#define EN_PIN         7   // Enable 핀
-#define DIR_PIN        5   // Direction 핀
-#define STEP_PIN       2   // Step 핀
+#define EN_PIN         5   // Enable 핀
+#define DIR_PIN        3   // Direction 핀
+#define STEP_PIN       4   // Step 핀
 #define SERIAL_PORT    Serial
 
 // TMC2209 설정
 #define R_SENSE        0.11f // Rsense value
-TMC2209Stepper driver(&SERIAL_PORT, R_SENSE); 
+TMC2209Stepper driver(&SERIAL_PORT, R_SENSE, 0b00); 
 
 // 목표 위치 설정
 long targetPosition = 0;  
@@ -25,12 +25,12 @@ void setup() {
   SERIAL_PORT.begin(115200);
   driver.begin();
   driver.toff(5);
-  driver.rms_current(600); // 모터의 RMS 전류 설정
-  driver.microsteps(16);   // 마이크로스텝 설정
+  driver.rms_current(1200); // 모터의 RMS 전류 설정
+  driver.microsteps(1);   // 마이크로스텝 설정
   driver.en_spreadCycle(true); // SpreadCycle 활성화
 
   // Start the serial communication at a baud rate of 9600
-  Serial.begin(9600);
+  Serial.begin(115200);
   Serial.println("Enter integers separated by spaces (e.g., '123 456 789'):");
 }
 
@@ -62,18 +62,23 @@ void loop() {
     
     // Process the string to extract integers and get the number of integers
     int numCount = processIncomingData(incomingData, numbers);
+    targetPosition = numbers[0];
+
+    digitalWrite(DIR_PIN, HIGH); 
   }
 
   if(driverOn){
     // motor control
     if (currentPosition < targetPosition) {
-      digitalWrite(DIR_PIN, HIGH); 
-      moveStep(STEP_PIN)
+      // digitalWrite(DIR_PIN, HIGH); 
+      moveStep(STEP_PIN);
+      Serial.println(currentPosition);
       currentPosition++;
     } 
     else if (currentPosition > targetPosition) {
-      digitalWrite(DIR_PIN, LOW); 
-      moveStep(STEP_PIN)
+      // digitalWrite(DIR_PIN, LOW); 
+      moveStep(STEP_PIN);
+      Serial.println(currentPosition);
       currentPosition--;
     } 
     else {
@@ -85,9 +90,10 @@ void loop() {
 
 void moveStep(int MotorPIN) {
   digitalWrite(MotorPIN, HIGH);
-  delayMicroseconds(100); // 스테핑 주기 설정
+  delayMicroseconds(5000); // 스테핑 주기 설정
   digitalWrite(MotorPIN, LOW);
-  delayMicroseconds(100);
+  delayMicroseconds(5000);
+  Serial.println("movestep");
 }
 
 void moveTo(long position) {
